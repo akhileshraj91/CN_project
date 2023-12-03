@@ -67,7 +67,7 @@ coords, W_np = get_graph_mat(n=10)
 # We also define the function `state2tens`, which translates such tuples into tensors (partially loosing the sequence order information).
 
 # %%
-State = namedtuple('State', ('W', 'coords', 'partial_solution'))
+State = namedtuple('State', ('W', 'coords', 'partial_solution','final_node'))
   
 def state2tens(state):
     """ Creates a Pytorch tensor representing the history of visited nodes, from a (single) state tuple.
@@ -78,12 +78,14 @@ def state2tens(state):
     solution = set(state.partial_solution)
     sol_last_node = state.partial_solution[-1] if len(state.partial_solution) > 0 else -1
     sol_first_node = state.partial_solution[0] if len(state.partial_solution) > 0 else -1
+    final_node = state.final_node
     coords = state.coords
     nr_nodes = coords.shape[0]
 
     xv = [[(1 if i in solution else 0),
            (1 if i == sol_first_node else 0),
            (1 if i == sol_last_node else 0),
+           (1 if i == final_node else 0),
            coords[i,0],
            coords[i,1]
           ] for i in range(nr_nodes)]
@@ -115,7 +117,7 @@ class QNet(nn.Module):
         # * A binary variable indicating whether the node is the first of the visited sequence
         # * A binary variable indicating whether the node is the last of the visited sequence
         # * The (x, y) coordinates of the node.
-        self.node_dim = 5
+        self.node_dim = 6
         
         # We can have an extra layer after theta_1 (for the sake of example to make the network deeper)
         nr_extra_layers_1 = 1
@@ -173,7 +175,7 @@ class QNet(nn.Module):
 model = QNet(3, T=1).to(device)
 coords, W_np = get_graph_mat(n=10)
 W = torch.tensor(W_np, dtype=torch.float32, device=device)
-xv = torch.rand((1, W.shape[0], 5)).to(device) # random node state
+xv = torch.rand((1, W.shape[0], 6)).to(device) # random node state
 Ws = W.unsqueeze(0)
 
 y = model(xv, Ws)
@@ -289,8 +291,8 @@ def total_distance(solution, W):
 # def is_state_final(state):
     # return len(set(state.partial_solution)) == state.W.shape[0]
 
-def is_state_final(state,final_state):
-    return final_state[0] in state.partial_solution
+def is_state_final(state):
+    return state.final_node[0] in state.partial_solution
         # return 1
     # else:
         # return 0
@@ -344,7 +346,7 @@ EMBEDDING_ITERATIONS_T = 1  # Number of embedding iterations T
 # Learning
 PENALTY = -100
 NR_EPISODES = 10000
-MEMORY_CAPACITY = 1000 
+MEMORY_CAPACITY = 2000 
 N_STEP_QL = 2  # Number of steps (n) in n-step Q-learning to wait before computing target reward estimate
 BATCH_SIZE = 16
 
@@ -440,7 +442,7 @@ for episode in range(NR_EPISODES):
     # solution = [random.randint(0, NR_NODES-1)]
     solution = initial_node
     # current state (tuple and tensor)
-    current_state = State(partial_solution=solution, W=W, coords=coords)
+    current_state = State(partial_solution=solution, W=W, coords=coords,final_node=final_node)
     current_state_tsr = state2tens(current_state)
     
     # Keep track of some variables for insertion in replay memory:
@@ -457,7 +459,7 @@ for episode in range(NR_EPISODES):
     final_flag = 0
     loss_prev = 0
 
-    while not is_state_final(current_state,final_node) and final_flag==0:
+    while not is_state_final(current_state) and final_flag==0:
         t += 1  # time step of this episode
         
         if epsilon >= random.random():
@@ -487,7 +489,7 @@ for episode in range(NR_EPISODES):
             reward = -(total_distance(next_solution, W) - total_distance(solution, W))
         # reward = -(total_distance(next_solution, W))
 
-        next_state = State(partial_solution=next_solution, W=W, coords=coords)
+        next_state = State(partial_solution=next_solution, W=W, coords=coords, final_node=final_node)
         next_state_tsr = state2tens(next_state)
         
         # store rewards and states obtained along this episode:
@@ -505,7 +507,7 @@ for episode in range(NR_EPISODES):
                                        next_state=next_state,
                                        next_state_tsr=next_state_tsr))
             
-        if is_state_final(next_state,final_node) and final_flag:
+        if is_state_final(next_state) or final_flag:
             for n in range(1, N_STEP_QL):
                 memory.remember(Experience(state=states[-n],
                                            state_tsr=states_tsrs[-n], 
@@ -522,7 +524,7 @@ for episode in range(NR_EPISODES):
         # take a gradient step
         loss = None
         # print("-------------------------------",len(memory))
-        if len(memory) >= BATCH_SIZE and len(memory) >= 500:
+        if len(memory) >= BATCH_SIZE and len(memory) >= 2000:
             experiences = memory.sample_batch(BATCH_SIZE)
             
             batch_states_tsrs = [e.state_tsr for e in experiences]
@@ -532,7 +534,7 @@ for episode in range(NR_EPISODES):
             
             for i, experience in enumerate(experiences):
                 target = experience.reward
-                if not is_state_final(experience.next_state,final_node) and final_flag == 0:
+                if not is_state_final(experience.next_state) and final_flag == 0:
                     if Q_func.get_best_action(experience.next_state_tsr, 
                                                             experience.next_state):
                         _, best_reward = Q_func.get_best_action(experience.next_state_tsr, 
@@ -615,7 +617,11 @@ Q_func, Q_net, optimizer, lr_scheduler = init_model(os.path.join(FOLDER_NAME, sh
 #     i, next_i = solution[-1], solution[0]
 #     plt.plot([coords[i, 0], coords[next_i, 0]], [coords[i, 1], coords[next_i, 1]], 'k', lw=2, alpha=0.8)
 #     plt.plot(coords[solution[0], 0], coords[solution[0], 1], 'x', markersize=10)
+# ## Re-run Best Model and Look at Paths
 
+# %%
+""" Get file with smallest distance
+"""
 
 def plot_solution(coords, mat, solution):
     plt.scatter(coords[:,0], coords[:,1])
@@ -677,17 +683,17 @@ for sample in range(1):
     # solution = [random.randint(0, NR_NODES-1)]
     # solution = [0]
     init_node = [0]
-    final_node = [2]
+    final_node = [5]
     solution = init_node
-    current_state = State(partial_solution=solution, W=W, coords=coords)
+    current_state = State(partial_solution=solution, W=W, coords=coords,final_node=final_node)
     current_state_tsr = state2tens(current_state)
-    while not is_state_final(current_state,final_node):
+    while not is_state_final(current_state):
         next_node, est_reward = Q_func.get_best_action(current_state_tsr, 
                                                        current_state)
         
         
         solution = solution + [next_node]
-        current_state = State(partial_solution=solution, W=W, coords=coords)
+        current_state = State(partial_solution=solution, W=W, coords=coords,final_node=final_node)
         current_state_tsr = state2tens(current_state)
         
     plt.figure()
