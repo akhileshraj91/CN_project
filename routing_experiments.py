@@ -263,6 +263,15 @@ class Memory(object):
         self.position = (self.position + 1) % self.capacity
         self.nr_inserts += 1
         
+    def reinsert(self, experience):
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.nr_inserts -= 1
+        self.position = (self.position - 1 + self.capacity) % self.capacity  
+        self.memory[self.position] = experience
+        self.position = (self.position + 1) % self.capacity
+        self.nr_inserts += 1
+        
     def sample_batch(self, batch_size):
         return random.sample(self.memory, batch_size)
     
@@ -336,7 +345,7 @@ def get_neighboring_nodes(node, connectivity_matrix):
 # ### Hyper-parameters
 
 # %%
-SEED = 1  # A seed for the random number generator
+SEED = 2  # A seed for the random number generator
 
 # Graph
 NR_NODES = 7  # Number of nodes N
@@ -345,7 +354,7 @@ EMBEDDING_ITERATIONS_T = 1  # Number of embedding iterations T
 
 # Learning
 PENALTY = -100
-NR_EPISODES = 10000
+NR_EPISODES = 2000
 MEMORY_CAPACITY = 2000 
 N_STEP_QL = 2  # Number of steps (n) in n-step Q-learning to wait before computing target reward estimate
 BATCH_SIZE = 16
@@ -354,8 +363,8 @@ GAMMA = 0.9
 INIT_LR = 5e-4
 LR_DECAY_RATE = 1. - 2e-5  # learning rate decay
 
-MIN_EPSILON = 0.1
-EPSILON_DECAY_RATE = 6e-4  # epsilon decay
+MIN_EPSILON = 0.2
+EPSILON_DECAY_RATE = 6e-3  # epsilon decay
 
 FOLDER_NAME = './models'  # where to checkpoint the best models
 
@@ -428,7 +437,9 @@ coords = np.array([[1,3],[2,5],[2,1],[3,3],[5,5],[5,1],[6,3]])
 W_np = [[0,3,2,0,0,0,0],[3,0,0,2,3,0,6],[2,0,0,8,0,3,0],[0,2,8,0,0,10,2],[0,3,0,0,0,0,5],[0,0,3,10,0,0,1],[0,6,0,2,5,1,0]]
 # W_np = [[1000,3,2,1000,1000,1000,1000],[3,1000,1000,2,3,1000,6],[2,1000,1000,8,1000,3,1000],[1000,2,8,1000,1000,10,2],[1000,3,1000,1000,1000,1000,5],[1000,1000,3,10,1000,1000,1],[1000,6,1000,2,5,1,1000]]
 W = torch.tensor(W_np, dtype=torch.float32, requires_grad=False, device=device)
-neigh = get_neighboring_nodes(1,W)
+# neigh = get_neighboring_nodes(1,W)
+TOT_MAT = 100*np.ones((NR_NODES,NR_NODES))
+
 for episode in range(NR_EPISODES):
     # sample a new random graph
     initial_node = [random.randint(0, NR_NODES-1)]
@@ -480,41 +491,65 @@ for episode in range(NR_EPISODES):
         # reward observed for taking this step
         if next_node == None:
             reward = PENALTY
-            next_solution = solution
+            # next_solution = solution
             final_flag = 1
-            next_node = solution[-1]
+            # next_node = solution[-1]
+            # next_state = State(partial_solution=next_solution, W=W, coords=coords, final_node=final_node)
+            # next_state_tsr = state2tens(next_state)
+            
+            # store rewards and states obtained along this episode:
+            # states.append(next_state)
+            # states_tsrs.append(next_state_tsr)
+            rewards[-1] = reward
+            # actions.append(next_node)
+            if len(solution) >= N_STEP_QL:
+                memory.reinsert(Experience(state=states[-N_STEP_QL],
+                                        state_tsr=states_tsrs[-N_STEP_QL],
+                                        action=actions[-N_STEP_QL],
+                                        reward=sum(rewards[-N_STEP_QL:]),
+                                        next_state=next_state,
+                                        next_state_tsr=next_state_tsr))
+                
+            if is_state_final(next_state) or final_flag:
+                for n in range(1, N_STEP_QL):
+                    memory.reinsert(Experience(state=states[-n],
+                                            state_tsr=states_tsrs[-n], 
+                                            action=actions[-n], 
+                                            reward=sum(rewards[-n:]), 
+                                            next_state=next_state,
+                                            next_state_tsr=next_state_tsr))
             # break
         else:
             next_solution = solution + [next_node]
             reward = -(total_distance(next_solution, W) - total_distance(solution, W))
         # reward = -(total_distance(next_solution, W))
 
-        next_state = State(partial_solution=next_solution, W=W, coords=coords, final_node=final_node)
-        next_state_tsr = state2tens(next_state)
-        
-        # store rewards and states obtained along this episode:
-        states.append(next_state)
-        states_tsrs.append(next_state_tsr)
-        rewards.append(reward)
-        actions.append(next_node)
-        
-        # store our experience in memory, using n-step Q-learning:
-        if len(solution) >= N_STEP_QL:
-            memory.remember(Experience(state=states[-N_STEP_QL],
-                                       state_tsr=states_tsrs[-N_STEP_QL],
-                                       action=actions[-N_STEP_QL],
-                                       reward=sum(rewards[-N_STEP_QL:]),
-                                       next_state=next_state,
-                                       next_state_tsr=next_state_tsr))
+            next_state = State(partial_solution=next_solution, W=W, coords=coords, final_node=final_node)
+            next_state_tsr = state2tens(next_state)
             
-        if is_state_final(next_state) or final_flag:
-            for n in range(1, N_STEP_QL):
-                memory.remember(Experience(state=states[-n],
-                                           state_tsr=states_tsrs[-n], 
-                                           action=actions[-n], 
-                                           reward=sum(rewards[-n:]), 
-                                           next_state=next_state,
-                                           next_state_tsr=next_state_tsr))
+            # store rewards and states obtained along this episode:
+            states.append(next_state)
+            states_tsrs.append(next_state_tsr)
+            rewards.append(reward)
+            actions.append(next_node)
+            
+            # store our experience in memory, using n-step Q-learning:
+            if len(solution) >= N_STEP_QL:
+                memory.remember(Experience(state=states[-N_STEP_QL],
+                                        state_tsr=states_tsrs[-N_STEP_QL],
+                                        action=actions[-N_STEP_QL],
+                                        reward=sum(rewards[-N_STEP_QL:]),
+                                        next_state=next_state,
+                                        next_state_tsr=next_state_tsr))
+                
+            if is_state_final(next_state) or final_flag:
+                for n in range(1, N_STEP_QL):
+                    memory.remember(Experience(state=states[-n],
+                                            state_tsr=states_tsrs[-n], 
+                                            action=actions[-n], 
+                                            reward=sum(rewards[-n:]), 
+                                            next_state=next_state,
+                                            next_state_tsr=next_state_tsr))
         
         # update state and current solution
         current_state = next_state
@@ -547,24 +582,29 @@ for episode in range(NR_EPISODES):
             # print('batch targets: {}'.format(batch_targets))
             loss = Q_func.batch_update(batch_states_tsrs, batch_Ws, batch_actions, batch_targets)
             losses.append(loss)
-            loss_diff = loss - loss_prev
-            if abs(loss_diff) < 0.001:
-                print(f"------------------------------------------------------------------{loss_diff}")
-                train_complete = 1
-                break
-            loss_prev = loss
+            # loss_diff = loss - loss_prev
+            # if abs(loss_diff) < 0.001:
+            #     print(f"------------------------------------------------------------------{loss_diff}")
+            #     train_complete = 1
+            #     break
+            # loss_prev = loss
 
             """ Save model when we reach a new low average path length
             """
-            med_length = np.median(path_lengths[-100:])
+            # med_length = np.median(path_lengths[-100:])
+            # if med_length < current_min_med_length:
+            #     current_min_med_length = med_length
+            #     checkpoint_model(Q_net, optimizer, lr_scheduler, loss, episode, med_length)
+            med_length = np.linalg.norm(TOT_MAT)
             if med_length < current_min_med_length:
                 current_min_med_length = med_length
                 checkpoint_model(Q_net, optimizer, lr_scheduler, loss, episode, med_length)
-    if train_complete:
-        break
+    # if train_complete:
+    #     break
                 
     length = total_distance(solution, W)
     path_lengths.append(length)
+    TOT_MAT[initial_node,final_node] = length
 
     if episode % 10 == 0:
         print('Ep %d. Loss = %.3f / median length = %.3f / last = %.4f / epsilon = %.4f / lr = %.4f' % (
@@ -594,34 +634,12 @@ plt.xlabel('episode')
 # ## Re-run Best Model and Look at Paths
 
 # %%
-""" Get file with smallest distance
-"""
+
 all_lengths_fnames = [f for f in os.listdir(FOLDER_NAME) if f.endswith('.tar')]
 shortest_fname = sorted(all_lengths_fnames, key=lambda s: float(s.split('.tar')[0].split('_')[-1]))[0]
 print('shortest avg length found: {}'.format(shortest_fname.split('.tar')[0].split('_')[-1]))
 
-""" Load checkpoint
-"""
 Q_func, Q_net, optimizer, lr_scheduler = init_model(os.path.join(FOLDER_NAME, shortest_fname))
-
-""" A function to plot solutions
-"""
-# def plot_solution(coords, mat, solution):
-#     plt.scatter(coords[:,0], coords[:,1])
-#     n = len(coords)
-    
-#     for idx in range(n-1):
-#         i, next_i = solution[idx], solution[idx+1]
-#         plt.plot([coords[i, 0], coords[next_i, 0]], [coords[i, 1], coords[next_i, 1]], 'k', lw=2, alpha=0.8)
-    
-#     i, next_i = solution[-1], solution[0]
-#     plt.plot([coords[i, 0], coords[next_i, 0]], [coords[i, 1], coords[next_i, 1]], 'k', lw=2, alpha=0.8)
-#     plt.plot(coords[solution[0], 0], coords[solution[0], 1], 'x', markersize=10)
-# ## Re-run Best Model and Look at Paths
-
-# %%
-""" Get file with smallest distance
-"""
 
 def plot_solution(coords, mat, solution):
     plt.scatter(coords[:,0], coords[:,1])
@@ -635,53 +653,12 @@ def plot_solution(coords, mat, solution):
     # plt.plot([coords[i, 0], coords[next_i, 0]], [coords[i, 1], coords[next_i, 1]], 'k', lw=2, alpha=0.8)
     plt.plot(coords[solution[0], 0], coords[solution[0], 1], 'x', markersize=10)
 
-    
-""" Generate example solutions
-"""
-# NR_NODES = 10
-# for sample in range(10):
-#     coords, W_np = get_graph_mat(n=NR_NODES)
-#     W = torch.tensor(W_np, dtype=torch.float32, requires_grad=False, device=device)
-    
-#     solution = [random.randint(0, NR_NODES-1)]
-#     current_state = State(partial_solution=solution, W=W, coords=coords)
-#     current_state_tsr = state2tens(current_state)
-    
-#     while not is_state_final(current_state):
-#         next_node, est_reward = Q_func.get_best_action(current_state_tsr, 
-#                                                        current_state)
-        
-        
-#         solution = solution + [next_node]
-#         current_state = State(partial_solution=solution, W=W, coords=coords)
-#         current_state_tsr = state2tens(current_state)
-        
-#     plt.figure()
-#     plot_solution(coords, W, solution)
-#     plt.title('model / len = {}'.format(total_distance(solution, W)))
-    
-#     # for comparison, plot a random solution
-#     plt.figure()
-#     random_solution = list(range(NR_NODES))
-#     plot_solution(coords, W, random_solution)
-#     plt.title('random / len = {}'.format(total_distance(random_solution, W)))
-#     plt.draw()
-# # %%
-# plt.show()
 
 NR_NODES = 7
 for sample in range(1):
     coords = np.array([[1,3],[2,5],[2,1],[3,3],[5,5],[5,1],[6,3]])
-    # W_np = distance_matrix(coords, coords)
     W_np = [[0,3,2,0,0,0,0],[3,0,0,2,3,0,6],[2,0,0,8,0,3,0],[0,2,8,0,0,10,2],[0,3,0,0,0,0,5],[0,0,3,10,0,0,1],[0,6,0,2,5,1,0]]
-    # W_np = [[1000,3,2,1000,1000,1000,1000],[3,1000,1000,2,3,1000,6],[2,1000,1000,8,1000,3,1000],[1000,2,8,1000,1000,10,2],[1000,3,1000,1000,1000,1000,5],[1000,1000,3,10,1000,1000,1],[1000,6,1000,2,5,1,1000]]
-
-    # W_np = np.array([[0,1,1,1.414],[1,0,1.414,1],[1,1.414,0,1],[1.414,1,1,0]])
-    # coords, W_np = get_graph_mat(n=NR_NODES)
     W = torch.tensor(W_np, dtype=torch.float32, requires_grad=False, device=device)
-    
-    # solution = [random.randint(0, NR_NODES-1)]
-    # solution = [0]
     init_node = [0]
     final_node = [5]
     solution = init_node
@@ -700,11 +677,6 @@ for sample in range(1):
     plot_solution(coords, W, solution)
     plt.title('model / len = {}'.format(total_distance(solution, W)))
     
-    # for comparison, plot a random solution
-    # plt.figure()
-    # random_solution = list(range(NR_NODES))
-    # plot_solution(coords, W, random_solution)
-    # plt.title('random / len = {}'.format(total_distance(random_solution, W)))
-    # plt.draw()
+
 # %%
 plt.show()
