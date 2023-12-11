@@ -1,0 +1,174 @@
+############## Dictionary of a topology ##########
+#
+# My aim is that this will get generated via some DSML
+# such as the one we can create in our model-driven
+# engineering environment called WebGME (www.webgme.org)
+# and so will generate information that is correct-by-construction.
+# Right now, because it is being created manually, mistakes can still
+# be made. For this triangle topology, things appear to work correctly.
+#
+#######################################
+#
+# Think of this YAML schema as the domain-specific language
+# in which the topology is described. Thereafter, it is fed to a
+# generic back-end orchestration middleware, which generates
+# the desired topology.
+#
+topo:
+  routers:
+    - router: "master"
+      ip: "172.10.0.1/24"
+    - router: "P"
+      ip: "172.16.3.1/24"  # we allow this to be default out of the two LANs
+      
+    - router: "Q"
+      ip: "192.168.10.1/24"  # this is the onlly LAN attached to Q
+      
+    - router: "R"
+      ip: "172.12.0.1/16"  # this is the only LAN attached to R
+      
+    - router: "S"
+      ip: ""   # S is an intermediate router.  IP assigned later
+      
+    - router: "T"
+      ip: ""   # T is an intermediate router. We will assign it an IP later.
+      
+    - router: "U"
+      ip: "10.85.8.1/24" # We use this LAN as the default
+      
+    - router: "V"
+      ip: "10.100.0.1/16"
+      
+
+  lans:  # We will assume interfaces numbered from 0 per LAN
+            # We will use lan name as prefix of switches and hosts
+    - name: "lan1"
+      router: "P"   # P-eth0
+      subnet: "172.16.3.0/24"
+      hosts: 3
+
+    - name: "lan2"
+      router: "P"  # P-eth1
+      subnet: "172.16.5.0/24"
+      hosts: 2
+
+    - name: "lan3"
+      router: "Q" # Q-eth0
+      subnet: "192.168.10.0/24"
+      hosts: 4
+
+    - name: "lan4"
+      router: "R" # R-eth0
+      subnet: "172.12.0.0/16"
+      hosts: 4
+
+    - name: "lan5"
+      router: "U"  # U-eth0
+      subnet: "10.85.8.0/24"
+      hosts: 3
+
+    - name: "lan6"
+      router: "U"  #U-eth1
+      subnet: "10.85.10.0/24"
+      hosts: 3
+
+    - name: "lan7"
+      router: "V" # V-eth0
+      subnet: "10.100.0.0/16"
+      hosts: 3
+
+    - name: "lan8"   # This is the special LAN comprising P and NAT node
+      router: "P" # P-eth2
+      subnet: "192.168.25.0/24"
+      hosts: 2       # We could or could not have hosts here
+      nat: nat0     # This LAN has a nat node, providing a way outside
+
+  nats:   # All the NATs listed in the LAN specs
+    - name: "nat0"
+      subnets:  # All the subnets who need NAT
+        - "172.16.3.0/24"
+        - "172.16.5.0/24"
+        - "192.168.10.0/24"
+        - "172.12.0.0/16"
+        - "10.85.8.0/24"
+        - "10.85.10.0/24"
+        - "10.100.0.0/16"
+
+  links:  # these are the router to router links where we just use the first addr
+            # to the first endpoint and second to the second endpoint
+            #
+            # ep = end point. I didn't want to call it source and destination
+            # In this topology, since there are one directional links, we
+            # have specified links along the direction. Also, used alphabetical order
+    - ep1-router: "P"  # P-eth3
+      ep2-router: "Q"  # Q-eth1
+      subnet: "10.50.1.0/24"
+      
+    - ep1-router: "Q"  # Q-eth2
+      ep2-router: "S"  # S-eth0
+      subnet: "10.51.1.0/24"
+      
+    - ep1-router: "Q"   # Q-eth3
+      ep2-router: "V"    # V-eth1
+      subnet: "10.52.1.0/24"
+      
+    - ep1-router: "R"  # R-eth1
+      ep2-router: "P"   # P-eth4
+      subnet: "10.53.1.0/24"
+      
+    - ep1-router: "R"  # R-eth2
+      ep2-router: "U"  # U-eth2
+      subnet: "10.54.1.0/24"
+      
+    - ep1-router: "S"  # S-eth1
+      ep2-router: "R"  # R-eth3
+      subnet: "10.55.1.0/24"
+      
+    - ep1-router: "S"  # S-eth2
+      ep2-router: "V"  # V-eth2
+      subnet: "10.56.1.0/24"
+      
+    - ep1-router: "T"  # T-eth0
+      ep2-router: "Q"  # Q-eth4
+      subnet: "10.57.1.0/24"
+      
+    - ep1-router: "U"  # U-eth3
+      ep2-router: "S"  # S-eth3
+      subnet: "10.58.1.0/24"
+      
+    - ep1-router: "V"  # V-eth3
+      ep2-router: "T"  # T-eth1
+      subnet: "10.59.1.0/24"
+      
+    - ep1-router: "V"  # V-eth4
+      ep2-router: "U"  # U-eth4
+      subnet: "10.60.1.0/24"
+    
+    - ep1-router: "master" #master-eth0
+      ep2-router: "P" #P-eth4
+      subnet: "10.61.1.0/24"
+
+    - ep1-router: "master" #master-eth1
+      ep2-router: "Q" #Q-eth5
+      subnet: "10.62.1.0/24"
+
+    - ep1-router: "master" #master-eth2
+      ep2-router: "R" #R-eth4
+      subnet: "10.63.1.0/24"
+
+    - ep1-router: "master" #master-eth3
+      ep2-router: "S" #S-eth3
+      subnet: "10.64.1.0/24"
+
+    - ep1-router: "master" #master-eth4
+      ep2-router: "T" #T-eth1
+      subnet: "10.65.1.0/24"
+
+    - ep1-router: "master" #master-eth5
+      ep2-router: "U" #U-eth4
+      subnet: "10.66.1.0/24"
+
+    - ep1-router: "master" #master-eth6
+      ep2-router: "V" #V-eth5
+      subnet: "10.67.1.0/24"  
+    

@@ -1,0 +1,221 @@
+{
+    "topo": {
+        "routers": [
+            {
+                "router": "master",
+                "ip": "172.10.0.1/24"
+            },
+            {
+                "router": "P",
+                "ip": "172.16.3.1/24"
+            },
+            {
+                "router": "Q",
+                "ip": "192.168.10.1/24"
+            },
+            {
+                "router": "R",
+                "ip": "172.12.0.1/16"
+            },
+            {
+                "router": "S",
+                "ip": ""
+            },
+            {
+                "router": "T",
+                "ip": ""
+            },
+            {
+                "router": "U",
+                "ip": "10.85.8.1/24"
+            },
+            {
+                "router": "V",
+                "ip": "10.100.0.1/16"
+            }
+        ],
+        "lans": [
+            {
+                "name": "lan1",
+                "router": "P",
+                "subnet": "172.16.3.0/24",
+                "hosts": 3
+            },
+            {
+                "name": "lan2",
+                "router": "P",
+                "subnet": "172.16.5.0/24",
+                "hosts": 2
+            },
+            {
+                "name": "lan3",
+                "router": "Q",
+                "subnet": "192.168.10.0/24",
+                "hosts": 4
+            },
+            {
+                "name": "lan4",
+                "router": "R",
+                "subnet": "172.12.0.0/16",
+                "hosts": 4
+            },
+            {
+                "name": "lan5",
+                "router": "U",
+                "subnet": "10.85.8.0/24",
+                "hosts": 3
+            },
+            {
+                "name": "lan6",
+                "router": "U",
+                "subnet": "10.85.10.0/24",
+                "hosts": 3
+            },
+            {
+                "name": "lan7",
+                "router": "V",
+                "subnet": "10.100.0.0/16",
+                "hosts": 3
+            },
+            {
+                "name": "lan8",
+                "router": "P",
+                "subnet": "192.168.25.0/24",
+                "hosts": 2,
+                "nat": "nat0"
+            }
+        ],
+        "nats": [
+            {
+                "name": "nat0",
+                "subnets": [
+                    "172.16.3.0/24",
+                    "172.16.5.0/24",
+                    "192.168.10.0/24",
+                    "172.12.0.0/16",
+                    "10.85.8.0/24",
+                    "10.85.10.0/24",
+                    "10.100.0.0/16"
+                ]
+            }
+        ],
+        "links": [
+            {
+                "ep1-router": "P",
+                "ep2-router": "Q",
+                "subnet": "10.50.1.0/24"
+            },
+            {
+                "ep1-router": "Q",
+                "ep2-router": "S",
+                "subnet": "10.51.1.0/24"
+            },
+            {
+                "ep1-router": "Q",
+                "ep2-router": "V",
+                "subnet": "10.52.1.0/24"
+            },
+            {
+                "ep1-router": "R",
+                "ep2-router": "P",
+                "subnet": "10.53.1.0/24"
+            },
+            {
+                "ep1-router": "R",
+                "ep2-router": "U",
+                "subnet": "10.54.1.0/24"
+            },
+            {
+                "ep1-router": "S",
+                "ep2-router": "R",
+                "subnet": "10.55.1.0/24"
+            },
+            {
+                "ep1-router": "S",
+                "ep2-router": "V",
+                "subnet": "10.56.1.0/24"
+            },
+            {
+                "ep1-router": "T",
+                "ep2-router": "Q",
+                "subnet": "10.57.1.0/24"
+            },
+            {
+                "ep1-router": "U",
+                "ep2-router": "S",
+                "subnet": "10.58.1.0/24"
+            },
+            {
+                "ep1-router": "V",
+                "ep2-router": "T",
+                "subnet": "10.59.1.0/24"
+            },
+            {
+                "ep1-router": "V",
+                "ep2-router": "U",
+                "subnet": "10.60.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "P",
+                "subnet": "10.61.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "Q",
+                "subnet": "10.62.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "R",
+                "subnet": "10.63.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "S",
+                "subnet": "10.64.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "T",
+                "subnet": "10.65.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "U",
+                "subnet": "10.66.1.0/24"
+            },
+            {
+                "ep1-router": "master",
+                "ep2-router": "V",
+                "subnet": "10.67.1.0/24"
+            }
+        ],
+        "routes": {
+            "P": [
+                "192.168.10.0/24 via 10.50.1.2 dev P-eth3",
+                "172.12.0.0/16 via 10.50.1.2 dev P-eth3",
+                "10.85.8.0/24 via 10.50.1.2 dev P-eth3",
+                "10.100.0.0/16 via 10.50.1.2 dev P-eth3"
+            ],
+            "Q": [
+                "172.12.0.0/16 via 10.51.1.2 dev Q-eth2",
+                "10.85.8.0/24 via 10.51.1.2 dev Q-eth2",
+                "10.100.0.0/16 via 10.51.1.2 dev Q-eth2"
+            ],
+            "S": [
+                "172.12.0.0/16 via 10.55.1.2 dev S-eth1",
+                "10.85.8.0/24 via 10.55.1.2 dev S-eth1",
+                "10.100.0.0/16 via 10.55.1.2 dev S-eth1"
+            ],
+            "R": [
+                "10.85.8.0/24 via 10.54.1.2 dev R-eth2",
+                "10.100.0.0/16 via 10.54.1.2 dev R-eth2"
+            ],
+            "U": [
+                "10.100.0.0/16 via 10.60.1.1 dev U-eth4"
+            ],
+            "V": []
+        }
+    }
+}
